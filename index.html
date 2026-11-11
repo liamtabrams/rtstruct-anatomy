@@ -29,7 +29,8 @@
   color-scheme: dark; }
 
 * { box-sizing: border-box; }
-body { background: var(--bg); color: var(--fg); font: 15px/1.55 var(--body); }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.6 var(--body); }
 .wrap { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
         padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 header.wrap { padding-block: 40px 8px; }
@@ -106,7 +107,7 @@ details:not([open]) > summary .tw::before { content: "▸"; }
 .row.item .kw { color: var(--accent); font-weight: 400; }
 .more { color: var(--muted); padding: 2px 6px 4px 24px; font-style: italic; white-space: nowrap; }
 .tree-group { font: 500 .7rem var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 10px 6px 4px; }
-.detail { padding: 16px; display: grid; gap: 12px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.detail { padding: 16px; display: grid; gap: 12px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 76px); }
 .detail .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .82rem; color: var(--muted); }
 .detail .meta code { color: var(--tag); }
 .codebox { position: relative; background: var(--sunk); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font: .8rem/1.55 var(--mono); overflow-x: auto; white-space: pre; color: var(--fg); }
@@ -175,48 +176,87 @@ footer.wrap { padding-block: 0 48px; color: var(--muted); font-size: .82rem; }
 .token.number { color: var(--tok-num); }
 .token.function, .token.builtin, .token.class-name { color: var(--tok-fn); }
 .token.operator, .token.punctuation { color: var(--muted); }
+
+/* ---------- tabs and one-recipe-at-a-time ---------- */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.tabs { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.tabrow { display: flex; gap: 2px; overflow-x: auto; }
+.tab { display: grid; gap: 1px; padding: 10px 16px 9px; text-decoration: none; color: var(--muted); border-bottom: 3px solid transparent;
+       margin-bottom: -1px; white-space: nowrap; }
+.tab b { font: 600 1.05rem var(--display); color: var(--fg); letter-spacing: .01em; }
+.tab span { font-size: .76rem; }
+.tab:hover b { color: var(--accent); }
+.tab[aria-selected="true"] { border-bottom-color: var(--accent); }
+.tab[aria-selected="true"] b { color: var(--accent); }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.hint { font-size: .93rem; }
+h2 { font-size: 1.6rem; }
+.recipe h3 { font-size: 1.2rem; }
+.toc { top: calc(env(safe-area-inset-top, 0px) + 76px); }
+.toc a { padding: 6px 10px; }
+.toc a[aria-current="true"] { background: var(--accent-soft); color: var(--fg); font-weight: 500; }
+.recipe-col { display: grid; gap: 12px; min-width: 0; }
+.recipe { padding: 20px; gap: 12px; }
+.recipe-nav { display: flex; justify-content: space-between; gap: 8px; }
+.recipe-nav a { padding: 8px 14px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--fg);
+                text-decoration: none; font-size: .9rem; max-width: 48%; }
+.recipe-nav a:hover, .recipe-nav a:focus-visible { border-color: var(--accent); }
+.recipe-nav a small { display: block; color: var(--muted); font-size: .74rem; }
+.recipe-nav a.next { text-align: right; margin-left: auto; }
+.cheat summary { cursor: pointer; padding: 12px 16px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+.cheat[open] summary { border-bottom: 1px solid var(--line); }
 footer a { color: var(--accent); }
 </style>
 
 <header class="wrap">
   <div class="eyebrow">DICOM RT Structure Set · public LCTSC data</div>
   <h1>RTSTRUCT Anatomy</h1>
-  <p class="lede">How one structure set file is put together: what nests inside what, how it points to its CT,
-    how the per-ROI lists join up, and how flat lists of numbers become organ outlines. Every value on this page
-    comes from the real file.</p>
+  <p class="lede">How one structure set file is put together, and how to read it with pydicom.
+    Every value on this page comes from the real file.</p>
   <div class="facts" id="facts"></div>
 </header>
 
+<nav class="tabs" aria-label="Views">
+  <div class="wrap tabrow" role="tablist">
+    <a class="tab" id="t-map" role="tab" href="#map"><b>Map</b><span>how the pieces connect</span></a>
+    <a class="tab" id="t-code" role="tab" href="#code"><b>Code</b><span>pydicom recipes</span></a>
+    <a class="tab" id="t-file" role="tab" href="#file"><b>File</b><span>every element</span></a>
+    <a class="tab" id="t-geometry" role="tab" href="#geometry"><b>Geometry</b><span>contours on slices</span></a>
+  </div>
+</nav>
+
 <main class="wrap">
-  <section id="map">
+  <section id="p-map" role="tabpanel" aria-labelledby="t-map">
     <div class="sec-head">
-      <div class="eyebrow">1 · The map</div>
       <h2>How the pieces connect</h2>
-      <p class="hint">Boxes inside boxes are sequences inside sequences. Click any box to find it in the file browser below.
+      <p class="hint">Boxes inside boxes are sequences inside sequences. Click any box to open it in the File view.
         Hover an ROI row to see it line up across the three lists.</p>
     </div>
     <div class="panel file" id="diagram"></div>
   </section>
 
-  <section id="code">
+  <section id="p-code" role="tabpanel" aria-labelledby="t-code" hidden>
     <div class="sec-head">
-      <div class="eyebrow">2 · The code</div>
       <h2>Reading it with pydicom</h2>
       <p class="hint">Recipes in the order you'd learn them. Every snippet ran against this file when the page was built,
         and <b>Out</b> is its real output. Like notebook cells they share variables, starting from <code>path</code>
         (the RTSTRUCT file) and <code>ct_folder</code> (the folder with its CT).</p>
     </div>
-    <div class="label">API at a glance</div>
-    <div class="panel api"><table class="api-t" id="api"></table></div>
     <div class="recipes-layout">
       <nav class="toc" id="toc" aria-label="Recipes"></nav>
-      <div class="recipes" id="recipes"></div>
+      <div class="recipe-col">
+        <div id="recipes"></div>
+        <div class="recipe-nav" id="rnav"></div>
+      </div>
     </div>
+    <details class="panel cheat">
+      <summary>API cheat sheet <span class="count" id="api-count"></span></summary>
+      <div class="api"><table class="api-t" id="api"></table></div>
+    </details>
   </section>
 
-  <section id="browse">
+  <section id="p-file" role="tabpanel" aria-labelledby="t-file" hidden>
     <div class="sec-head">
-      <div class="eyebrow">3 · The file</div>
       <h2>Every element, with its pydicom path</h2>
       <p class="hint">The full tree, as pydicom reads it. Sequences with more than 5 items show the first 2.
         Click a line to see its tag, data type, meaning, and the exact code to reach it.</p>
@@ -227,9 +267,8 @@ footer a { color: var(--accent); }
     </div>
   </section>
 
-  <section id="contours">
+  <section id="p-geometry" role="tabpanel" aria-labelledby="t-geometry" hidden>
     <div class="sec-head">
-      <div class="eyebrow">4 · The geometry</div>
       <h2>From ContourData to outlines</h2>
       <p class="hint">Each polygon is one <code>ContourSequence</code> item: a flat list x₁,y₁,z₁, x₂,y₂,z₂ … in mm (patient
         coordinates, LPS). Move through the slices, then click an outline to see its points and the code that reads it.
@@ -427,9 +466,10 @@ function reveal(path) {
   if (!row) return;
   for (let d = row.closest("details"); d; d = d.parentElement.closest("details")) d.open = true;
   select(row._node, row);
+  if (location.hash !== "#file") history.pushState(null, "", "#file");
+  showTab("file");
   const tree = $("#tree");
-  tree.scrollTo({ top: row.offsetTop - tree.offsetTop - 60, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
-  $("#browse").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  tree.scrollTo({ top: row.offsetTop - tree.offsetTop - 60 });
 }
 
 (function buildTree() {
@@ -531,10 +571,11 @@ function reveal(path) {
   const tb = el("tbody");
   for (const [call, what] of DATA.api) tb.append(el("tr", {}, el("td", {}, el("code", { text: call })), el("td", { text: what })));
   api.append(tb);
+  $("#api-count").textContent = `${DATA.api.length} calls`;
 
   DATA.recipes.forEach((r, k) => {
-    const n = `2.${k + 1}`;
-    $("#toc").append(el("a", { href: `#r-${r.id}` }, el("span", { class: "n", text: n }), r.title));
+    const n = String(k + 1);
+    $("#toc").append(el("a", { href: `#r-${r.id}`, "data-id": r.id }, el("span", { class: "n", text: n }), r.title));
     const code = el("code", { class: "language-python", text: r.code });
     const pre = el("pre", {}, code);
     const copy = el("button", { class: "copy", type: "button", text: "Copy" });
@@ -542,14 +583,44 @@ function reveal(path) {
       const done = () => { copy.textContent = "Copied"; setTimeout(() => copy.textContent = "Copy", 1400); };
       try { navigator.clipboard.writeText(r.code).then(done, () => selectText(code)); } catch (e) { selectText(code); }
     });
-    $("#recipes").append(el("article", { class: "panel recipe", id: `r-${r.id}` },
-      el("div", { class: "recipe-h" }, el("span", { class: "rnum", text: n }), el("h3", { text: r.title })),
+    $("#recipes").append(el("article", { class: "panel recipe", "data-id": r.id, hidden: "" },
+      el("div", { class: "recipe-h" }, el("span", { class: "rnum", text: `${n} of ${DATA.recipes.length}` }), el("h3", { text: r.title })),
       el("p", { class: "hint", text: r.why }),
       el("div", { class: "cell in" }, el("div", { class: "prompt", text: "In" }), el("div", { class: "pre-wrap" }, pre, copy)),
       r.output ? el("div", { class: "cell out" }, el("div", { class: "prompt", text: "Out" }), el("pre", { text: r.output })) : null));
     if (window.Prism) Prism.highlightElement(code);
   });
 })();
+
+let currentRecipe = null;
+function showRecipe(id) {
+  const R = DATA.recipes, k = Math.max(0, R.findIndex(r => r.id === id));
+  currentRecipe = R[k].id;
+  document.querySelectorAll("#recipes .recipe").forEach(a => a.hidden = a.dataset.id !== R[k].id);
+  document.querySelectorAll("#toc a").forEach(a => a.setAttribute("aria-current", String(a.dataset.id === R[k].id)));
+  const nav = $("#rnav"); nav.replaceChildren();
+  if (k > 0) nav.append(el("a", { class: "prev", href: `#r-${R[k - 1].id}` }, el("small", { text: "← Previous" }), R[k - 1].title));
+  if (k < R.length - 1) nav.append(el("a", { class: "next", href: `#r-${R[k + 1].id}` }, el("small", { text: "Next →" }), R[k + 1].title));
+}
+
+/* ---------------- tabs: one view at a time, routed on the hash ---------------- */
+const TABS = ["map", "code", "file", "geometry"];
+function showTab(name) {
+  for (const t of TABS) {
+    $(`#p-${t}`).hidden = t !== name;
+    $(`#t-${t}`).setAttribute("aria-selected", String(t === name));
+  }
+  if (name === "geometry" && window.redrawSlice) window.redrawSlice();
+}
+function route() {
+  const h = location.hash.slice(1);
+  if (h.startsWith("r-")) { showTab("code"); showRecipe(h.slice(2)); }
+  else { showTab(TABS.includes(h) ? h : "map"); if (h === "code") showRecipe(currentRecipe); }
+  const tabs = $(".tabs");
+  if (scrollY > tabs.offsetTop) scrollTo({ top: tabs.offsetTop });
+}
+addEventListener("hashchange", route);
+addEventListener("popstate", route);
 
 /* ---------------- slice viewer ---------------- */
 (function viewer() {
@@ -669,6 +740,10 @@ c.ContourImageSequence[0].ReferencedSOPInstanceUID   # CT slice at z ${s.z.toFix
 
   zIn.addEventListener("input", () => { sel = null; draw(); });
   addEventListener("resize", () => draw());
+  window.redrawSlice = draw;
   draw();
 })();
+
+showRecipe(null);
+route();
 </script>
